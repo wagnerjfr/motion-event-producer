@@ -24,6 +24,9 @@ import org.dyn4j.geometry.Geometry;
 import org.dyn4j.geometry.MassType;
 import org.dyn4j.geometry.Vector2;
 import org.dyn4j.world.World;
+import org.dyn4j.world.listener.ContactListenerAdapter;
+import org.dyn4j.world.ContactCollisionData;
+import org.dyn4j.dynamics.contact.Contact;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -129,7 +132,6 @@ public class CircleCollisionsApp extends Application {
                 if (!paused) {
                     world.step(1, dt);
                     emitPositionEventsIfDue();
-                    detectAndEmitCollisionEvents();
                 }
 
                 render(gc);
@@ -148,6 +150,49 @@ public class CircleCollisionsApp extends Application {
     private void createWorld() {
         world = new World<>();
         world.setGravity(new Vector2(0, 9.8));
+        world.addContactListener(new ContactListenerAdapter<Body>() {
+            @Override
+            public void begin(ContactCollisionData<Body> collision, Contact contact) {
+                Object aData = collision.getBody1().getUserData();
+                Object bData = collision.getBody2().getUserData();
+                if (!(aData instanceof String idA) || !(bData instanceof String idB)) {
+                    return;
+                }
+
+                String pairKey = pairKey(idA, idB);
+                if (activePairContacts.contains(pairKey)) {
+                    return;
+                }
+                activePairContacts.add(pairKey);
+
+                Vector2 va = collision.getBody1().getLinearVelocity();
+                Vector2 vb = collision.getBody2().getLinearVelocity();
+                double rvx = va.x - vb.x;
+                double rvy = va.y - vb.y;
+                double relativeSpeed = Math.sqrt(rvx * rvx + rvy * rvy);
+                Vector2 p = contact.getPoint();
+
+                eventEmitter.emitCollision(new CollisionEvent(
+                        idA,
+                        idB,
+                        System.currentTimeMillis(),
+                        p.x,
+                        p.y,
+                        relativeSpeed
+                ));
+            }
+
+            @Override
+            public void end(ContactCollisionData<Body> collision, Contact contact) {
+                Object aData = collision.getBody1().getUserData();
+                Object bData = collision.getBody2().getUserData();
+                if (!(aData instanceof String idA) || !(bData instanceof String idB)) {
+                    return;
+                }
+
+                activePairContacts.remove(pairKey(idA, idB));
+            }
+        });
         circles.clear();
         circleColors.clear();
         ballIds.clear();
@@ -203,7 +248,9 @@ public class CircleCollisionsApp extends Application {
         world.addBody(body);
         circles.add(body);
         circleColors.add(Color.hsb(random.nextDouble() * 360, 0.75, 0.95));
-        ballIds.put(body, "ball-" + nextBallId++);
+        String ballId = "ball-" + nextBallId++;
+        ballIds.put(body, ballId);
+        body.setUserData(ballId);
     }
 
     private void emitPositionEventsIfDue() {
@@ -226,55 +273,6 @@ public class CircleCollisionsApp extends Application {
                     v.y
             ));
         }
-    }
-
-    private void detectAndEmitCollisionEvents() {
-        long now = System.currentTimeMillis();
-        Set<String> currentContacts = new HashSet<>();
-
-        for (int i = 0; i < circles.size(); i++) {
-            Body a = circles.get(i);
-            for (int j = i + 1; j < circles.size(); j++) {
-                Body b = circles.get(j);
-
-                Vector2 pa = a.getWorldCenter();
-                Vector2 pb = b.getWorldCenter();
-                double ra = a.getFixtures().get(0).getShape().getRadius();
-                double rb = b.getFixtures().get(0).getShape().getRadius();
-                double dx = pb.x - pa.x;
-                double dy = pb.y - pa.y;
-                double distanceSq = dx * dx + dy * dy;
-                double contactDistance = (ra + rb) * 1.02;
-                boolean inContact = distanceSq <= (contactDistance * contactDistance);
-
-                String idA = ballIds.get(a);
-                String idB = ballIds.get(b);
-                String pairKey = pairKey(idA, idB);
-
-                if (inContact) {
-                    currentContacts.add(pairKey);
-                    if (!activePairContacts.contains(pairKey)) {
-                        Vector2 va = a.getLinearVelocity();
-                        Vector2 vb = b.getLinearVelocity();
-                        double rvx = va.x - vb.x;
-                        double rvy = va.y - vb.y;
-                        double relativeSpeed = Math.sqrt(rvx * rvx + rvy * rvy);
-
-                        eventEmitter.emitCollision(new CollisionEvent(
-                                idA,
-                                idB,
-                                now,
-                                (pa.x + pb.x) * 0.5,
-                                (pa.y + pb.y) * 0.5,
-                                relativeSpeed
-                        ));
-                    }
-                }
-            }
-        }
-
-        activePairContacts.clear();
-        activePairContacts.addAll(currentContacts);
     }
 
     private String pairKey(String a, String b) {
