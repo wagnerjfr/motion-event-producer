@@ -5,7 +5,7 @@
 ### JavaFX + dyn4j simulation that now emits runtime events for future streaming integration.
 
 ## Full Article:
-### ⭐ [How I Built a Java Physics Simulation That Publishes Real-Time Kafka Events]()
+### ⭐ [How I Built a Java Physics Simulation That Publishes Real-Time Kafka Events](https://medium.com/itnext/how-i-built-a-java-physics-simulation-that-publishes-real-time-kafka-events-2ec3f9d71156)
 _A practical guide to producing motion and collision events from a Java physics simulation into Kafka._
 
 ## Running locally with Kafka + AKHQ
