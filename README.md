@@ -43,7 +43,7 @@ Kafka is now integrated through `KafkaEventEmitter`.
 
 If `APP_KAFKA_ENABLED=false`, the app bypasses Kafka and emits only logs (`LoggingEventEmitter`).
 
-### Docker Kafka (recommended: shared network with Kafka UI)
+### Docker Kafka (recommended: shared network with AKHQ)
 
 Create a dedicated Docker network (once):
 
@@ -70,18 +70,21 @@ docker run -d --name kafka --network kafka-net -p 9092:9092 \
   apache/kafka:3.8.0
 ```
 
-Run Kafka UI on the same network:
+Run **AKHQ** on the same network:
 
 ```bash
-docker run -d --name kafka-ui --network kafka-net -p 8080:8080 \
-  -e KAFKA_CLUSTERS_0_NAME=local \
-  -e KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092 \
-  provectuslabs/kafka-ui:latest
+docker run -d --name akhq --network kafka-net -p 8081:8080 \
+  -e AKHQ_CONFIGURATION='akhq:
+  connections:
+    local:
+      properties:
+        bootstrap.servers: "kafka:29092"' \
+  tchiotludo/akhq
 ```
 
 Open UI:
 
-- `http://localhost:8080`
+- `http://localhost:8081`
 
 Create topics:
 
