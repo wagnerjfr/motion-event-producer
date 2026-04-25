@@ -2,6 +2,15 @@
 
 JavaFX + dyn4j simulation that now emits runtime events for future streaming integration.
 
+## Architecture
+
+- **JavaFX** handles visualization and simulation loop.
+- **Spring Boot** now boots alongside JavaFX and provides dependency injection/configuration.
+- `MotionEventProducerApplication` defines infrastructure beans (currently `EventEmitter`).
+- `CircleCollisionsApp` starts Spring context on app startup and closes it on app shutdown.
+
+This prepares the project for future Kafka integration while keeping current behavior unchanged.
+
 ## Current emitted events
 
 - **PositionEvent** (throttled, every ~100ms):

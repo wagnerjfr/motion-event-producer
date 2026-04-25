@@ -1,7 +1,6 @@
 package com.simulation.producer;
 
 import com.simulation.producer.emitter.EventEmitter;
-import com.simulation.producer.emitter.LoggingEventEmitter;
 import com.simulation.producer.events.CollisionEvent;
 import com.simulation.producer.events.PositionEvent;
 import javafx.animation.AnimationTimer;
@@ -17,6 +16,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.dyn4j.dynamics.Body;
 import org.dyn4j.dynamics.BodyFixture;
 import org.dyn4j.geometry.Geometry;
@@ -48,7 +49,8 @@ public class CircleCollisionsApp extends Application {
     private final List<Color> circleColors = new ArrayList<>();
     private final Map<Body, String> ballIds = new HashMap<>();
     private final Set<String> activePairContacts = new HashSet<>();
-    private final EventEmitter eventEmitter = new LoggingEventEmitter();
+    private EventEmitter eventEmitter;
+    private ConfigurableApplicationContext springContext;
 
     private int nextBallId = 1;
     private long lastPositionEmitMs = 0;
@@ -59,6 +61,11 @@ public class CircleCollisionsApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        springContext = new SpringApplicationBuilder(MotionEventProducerApplication.class)
+                .headless(false)
+                .run();
+        eventEmitter = springContext.getBean(EventEmitter.class);
+
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
@@ -129,6 +136,13 @@ public class CircleCollisionsApp extends Application {
             }
         };
         timer.start();
+    }
+
+    @Override
+    public void stop() {
+        if (springContext != null) {
+            springContext.close();
+        }
     }
 
     private void createWorld() {
