@@ -64,7 +64,7 @@ public class CircleCollisionsApp extends Application {
         springContext = new SpringApplicationBuilder(MotionEventProducerApplication.class)
                 .headless(false)
                 .run();
-        eventEmitter = springContext.getBean(EventEmitter.class);
+        eventEmitter = springContext.getBean("eventEmitter", EventEmitter.class);
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
