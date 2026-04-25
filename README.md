@@ -1,57 +1,40 @@
 # motion-event-producer
 
-JavaFX + dyn4j simulation that now emits runtime events for future streaming integration.
+![Project](docs/images/project.jpg)
 
-## Architecture
+### JavaFX + dyn4j simulation that now emits runtime events for future streaming integration.
 
-- **JavaFX** handles visualization and simulation loop.
-- **Spring Boot** now boots alongside JavaFX and provides dependency injection/configuration.
-- `MotionEventProducerApplication` defines infrastructure beans (currently `EventEmitter`).
-- `CircleCollisionsApp` starts Spring context on app startup and closes it on app shutdown.
+## Full Article:
+### ⭐ [How I Built a Java Physics Simulation That Publishes Real-Time Kafka Events]()
+_A practical guide to producing motion and collision events from a Java physics simulation into Kafka._
 
-This prepares the project for future Kafka integration while keeping current behavior unchanged.
+## Running locally with Kafka + AKHQ
 
-## Current emitted events
+AKHQ is a lightweight web UI for Kafka. You can use it to inspect topics, browse messages, check partitions/offsets, and monitor consumer groups while the simulation is running.
 
-- **PositionEvent** (throttled, every ~100ms):
-  - `ballId`, `timestampMs`, `x`, `y`, `vx`, `vy`
-- **CollisionEvent** (on new circle-circle contact):
-  - `ballAId`, `ballBId`, `timestampMs`, `x`, `y`, `relativeSpeed`
+### Prerequisites
 
-Events are emitted through an abstraction:
+- Docker running locally
+- Java 17
+- Maven 3.9+
+- Ports available: `9092` (Kafka) and `8081` (AKHQ)
 
-- `EventEmitter` interface
-- `LoggingEventEmitter` implementation (prints JSON-like lines to stdout)
+### Get the project
 
-This keeps the app **Kafka-ready**: next phase can add a `KafkaEventEmitter` implementing the same interface.
+```bash
+git clone git@github.com:wagnerjfr/motion-event-producer.git
+cd motion-event-producer
+```
 
-## Kafka integration
+### Path A (recommended): App on host + Kafka/AKHQ in Docker
 
-Kafka is now integrated through `KafkaEventEmitter`.
-
-- Position events are published to topic: `motion-position`
-- Collision events are published to topic: `motion-collision`
-- If Kafka publish fails, the app falls back to `LoggingEventEmitter`.
-
-### Config (env overrides)
-
-- `APP_KAFKA_ENABLED` (default `true`)
-- `KAFKA_BOOTSTRAP_SERVERS` (default `localhost:9092`)
-- `KAFKA_TOPIC_POSITION` (default `motion-position`)
-- `KAFKA_TOPIC_COLLISION` (default `motion-collision`)
-- `KAFKA_CLIENT_ID` (default `motion-event-producer`)
-
-If `APP_KAFKA_ENABLED=false`, the app bypasses Kafka and emits only logs (`LoggingEventEmitter`).
-
-### Docker Kafka (recommended: shared network with AKHQ)
-
-Create a dedicated Docker network (once):
+#### 1) Create a Docker network (once)
 
 ```bash
 docker network create kafka-net
 ```
 
-Run Kafka on that network (dual listeners: one for host apps, one for Docker clients):
+#### 2) Start Kafka (dual listeners)
 
 ```bash
 docker run -d --name kafka --network kafka-net -p 9092:9092 \
@@ -70,7 +53,7 @@ docker run -d --name kafka --network kafka-net -p 9092:9092 \
   apache/kafka:3.8.0
 ```
 
-Run **AKHQ** on the same network:
+#### 3) Start AKHQ
 
 ```bash
 docker run -d --name akhq --network kafka-net -p 8081:8080 \
@@ -82,48 +65,66 @@ docker run -d --name akhq --network kafka-net -p 8081:8080 \
   tchiotludo/akhq
 ```
 
-Open UI:
+Open AKHQ at:
 
 - `http://localhost:8081`
 
-Create topics:
+#### 4) Create topics
 
 ```bash
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --create --topic motion-position --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --create --topic motion-collision --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
 ```
 
-Consume to verify:
+#### 5) Compile and run the producer app
+
+```bash
+mvn -DskipTests compile
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092 mvn javafx:run
+```
+
+![Simulation UI](docs/images/simulation-ui.png)
+
+#### 6) Verify events
+
+- In AKHQ, open `motion-position` and `motion-collision` topics and inspect incoming records.
+![AKHQ Topics](docs/images/akhq-topics.png)
+
+- Optional CLI verification:
 
 ```bash
 docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --topic motion-position --bootstrap-server localhost:9092 --from-beginning
 docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --topic motion-collision --bootstrap-server localhost:9092 --from-beginning
 ```
 
-> If your producer app runs on your host machine (not inside Docker), use `localhost:9092`.
-> If a client runs inside Docker on `kafka-net`, use `kafka:29092`.
+### Path B: Logs-only mode (no Kafka)
 
-## Run
-
-### 1) Compile
-
-```bash
-mvn -DskipTests compile
-```
-
-### 2) Run with Kafka (host app)
-
-```bash
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092 mvn javafx:run
-```
-
-### 3) Run logs-only (Kafka disabled)
+Use this mode if Kafka is unavailable or you just want to test simulation + event generation quickly:
 
 ```bash
 APP_KAFKA_ENABLED=false mvn javafx:run
 ```
 
-### 4) Bootstrap quick reference
+### Path C: Custom topics / broker
 
-- If your JavaFX app runs on the host, use `localhost:9092`
-- If a client runs inside Docker on `kafka-net`, use `kafka:29092`
+Override defaults with env vars:
+
+```bash
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+KAFKA_TOPIC_POSITION=my-position-topic \
+KAFKA_TOPIC_COLLISION=my-collision-topic \
+KAFKA_CLIENT_ID=motion-event-producer-dev \
+mvn javafx:run
+```
+
+### Bootstrap address quick reference
+
+- Producer app on host machine: `localhost:9092`
+- Clients/containers on `kafka-net`: `kafka:29092`
+
+### Troubleshooting
+
+- **Port conflict**: if `9092` or `8081` is busy, stop conflicting services or remap ports.
+- **No messages in AKHQ**: confirm app is running with Kafka enabled and using `KAFKA_BOOTSTRAP_SERVERS=localhost:9092`.
+- **Cannot connect from container**: inside Docker network, use `kafka:29092` (not `localhost:9092`).
+- **Topic errors**: create topics manually (commands above) before running consumers.
