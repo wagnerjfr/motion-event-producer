@@ -151,12 +151,6 @@ This project includes a minimal gateway skeleton:
 Run it:
 
 ```bash
-mvn -DskipTests spring-boot:run -Dspring-boot.run.main-class=com.simulation.producer.gateway.EventGatewayApplication
-```
-
-If needed, force gateway port explicitly:
-
-```bash
 SERVER_PORT=8080 mvn -DskipTests spring-boot:run -Dspring-boot.run.main-class=com.simulation.producer.gateway.EventGatewayApplication
 ```
 

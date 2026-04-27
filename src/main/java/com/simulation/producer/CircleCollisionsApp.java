@@ -14,6 +14,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -45,12 +48,18 @@ public class CircleCollisionsApp extends Application {
     private static final int INITIAL_CIRCLES = 40;
     private static final double MIN_RADIUS_PX = 8;
     private static final double MAX_RADIUS_PX = 22;
+    private static final double FLOOR_VISUAL_HEIGHT_PX = 26;
     private static final long POSITION_EMIT_INTERVAL_MS = 100;
+    private static final double MIN_SPEED_TO_EMIT = 0.06; // m/s
+    private static final double MIN_POSITION_DELTA_TO_EMIT = 0.015; // meters
+    private static final long IDLE_HEARTBEAT_EMIT_INTERVAL_MS = 3000;
 
     private final Random random = new Random();
     private final List<Body> circles = new ArrayList<>();
     private final List<Color> circleColors = new ArrayList<>();
     private final Map<Body, String> ballIds = new HashMap<>();
+    private final Map<String, Vector2> lastEmittedPositions = new HashMap<>();
+    private final Map<String, Long> lastEmittedAtMs = new HashMap<>();
     private final Set<String> activePairContacts = new HashSet<>();
     private EventEmitter eventEmitter;
     private ConfigurableApplicationContext springContext;
@@ -196,14 +205,17 @@ public class CircleCollisionsApp extends Application {
         circles.clear();
         circleColors.clear();
         ballIds.clear();
+        lastEmittedPositions.clear();
+        lastEmittedAtMs.clear();
         activePairContacts.clear();
         nextBallId = 1;
         lastPositionEmitMs = 0;
 
         double thicknessPx = 30;
+        double floorTopPx = HEIGHT - FLOOR_VISUAL_HEIGHT_PX;
 
         // floor
-        addStaticWall(WIDTH / 2.0, HEIGHT + thicknessPx / 2.0, WIDTH, thicknessPx);
+        addStaticWall(WIDTH / 2.0, floorTopPx + thicknessPx / 2.0, WIDTH, thicknessPx);
         // ceiling
         addStaticWall(WIDTH / 2.0, -thicknessPx / 2.0, WIDTH, thicknessPx);
         // left wall
@@ -262,8 +274,25 @@ public class CircleCollisionsApp extends Application {
 
         for (Body body : circles) {
             String ballId = ballIds.get(body);
+            if (ballId == null) {
+                continue;
+            }
+
             Vector2 p = body.getWorldCenter();
             Vector2 v = body.getLinearVelocity();
+
+            double speed = Math.hypot(v.x, v.y);
+            Vector2 lastEmittedPosition = lastEmittedPositions.get(ballId);
+            long lastEmittedAt = lastEmittedAtMs.getOrDefault(ballId, 0L);
+            boolean heartbeatDue = now - lastEmittedAt >= IDLE_HEARTBEAT_EMIT_INTERVAL_MS;
+            boolean movedEnough = lastEmittedPosition == null
+                    || p.distance(lastEmittedPosition) >= MIN_POSITION_DELTA_TO_EMIT;
+            boolean movingEnough = speed >= MIN_SPEED_TO_EMIT;
+
+            if (!movingEnough && !movedEnough && !heartbeatDue) {
+                continue;
+            }
+
             eventEmitter.emitPosition(new PositionEvent(
                     ballId,
                     now,
@@ -272,6 +301,8 @@ public class CircleCollisionsApp extends Application {
                     v.x,
                     v.y
             ));
+            lastEmittedPositions.put(ballId, new Vector2(p.x, p.y));
+            lastEmittedAtMs.put(ballId, now);
         }
     }
 
@@ -282,6 +313,15 @@ public class CircleCollisionsApp extends Application {
     private void render(GraphicsContext gc) {
         gc.setFill(Color.rgb(18, 22, 28));
         gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // visible ground (physics floor already exists in the world)
+        double floorY = HEIGHT - FLOOR_VISUAL_HEIGHT_PX;
+        gc.setFill(Color.rgb(55, 60, 68));
+        gc.fillRect(0, floorY, WIDTH, FLOOR_VISUAL_HEIGHT_PX);
+        gc.setStroke(Color.rgb(150, 158, 172, 0.75));
+        gc.strokeLine(0, floorY, WIDTH, floorY);
+
+        gc.setTextAlign(TextAlignment.CENTER);
 
         for (int i = 0; i < circles.size(); i++) {
             Body body = circles.get(i);
@@ -297,6 +337,20 @@ public class CircleCollisionsApp extends Application {
 
             gc.setStroke(Color.rgb(255, 255, 255, 0.2));
             gc.strokeOval(x - radiusPx, y - radiusPx, radiusPx * 2, radiusPx * 2);
+
+            String ballId = ballIds.getOrDefault(body, "");
+            String label = ballId.startsWith("ball-") ? ballId.substring("ball-".length()) : ballId;
+
+            double fontSize = Math.max(10, Math.min(16, radiusPx * 0.9));
+            gc.setFont(Font.font("System", FontWeight.BOLD, fontSize));
+
+            double baselineY = y + (fontSize * 0.35);
+
+            gc.setFill(Color.rgb(0, 0, 0, 0.45));
+            gc.fillText(label, x + 1.5, baselineY + 1.5);
+
+            gc.setFill(Color.WHITE);
+            gc.fillText(label, x, baselineY);
         }
     }
 
