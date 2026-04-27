@@ -4,11 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simulation.producer.emitter.EventEmitter;
 import com.simulation.producer.emitter.KafkaEventEmitter;
 import com.simulation.producer.emitter.LoggingEventEmitter;
+import com.simulation.producer.emitter.WebSocketEventEmitter;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.KafkaTemplate;
 
 @SpringBootApplication
@@ -25,9 +24,7 @@ public class MotionEventProducerApplication {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true", matchIfMissing = true)
-    @Primary
-    public EventEmitter kafkaEventEmitter(
+    public KafkaEventEmitter kafkaEventEmitter(
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
             @Value("${app.kafka.topics.position}") String positionTopic,
@@ -43,15 +40,36 @@ public class MotionEventProducerApplication {
         );
     }
 
-    @Bean(name = "eventEmitter")
-    @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "false")
-    public EventEmitter loggingOnlyEventEmitter(LoggingEventEmitter loggingEventEmitter) {
-        return loggingEventEmitter;
+    @Bean
+    public WebSocketEventEmitter websocketEventEmitter(
+            ObjectMapper objectMapper,
+            @Value("${app.websocket.url}") String websocketUrl,
+            @Value("${app.websocket.reconnect-ms}") long reconnectMs,
+            LoggingEventEmitter loggingEventEmitter
+    ) {
+        return new WebSocketEventEmitter(
+                objectMapper,
+                websocketUrl,
+                reconnectMs,
+                loggingEventEmitter
+        );
     }
 
     @Bean(name = "eventEmitter")
-    @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true", matchIfMissing = true)
-    public EventEmitter primaryEventEmitterAlias(EventEmitter kafkaEventEmitter) {
-        return kafkaEventEmitter;
+    public EventEmitter eventEmitter(
+            @Value("${app.transport.mode:kafka}") String transportMode,
+            KafkaEventEmitter kafkaEventEmitter,
+            WebSocketEventEmitter websocketEventEmitter,
+            LoggingEventEmitter loggingEventEmitter
+    ) {
+        return switch (transportMode.toLowerCase()) {
+            case "websocket", "ws" -> websocketEventEmitter;
+            case "logs", "log", "logging" -> loggingEventEmitter;
+            case "kafka" -> kafkaEventEmitter;
+            default -> {
+                System.err.println("Unknown app.transport.mode='" + transportMode + "', falling back to logs mode");
+                yield loggingEventEmitter;
+            }
+        };
     }
 }
