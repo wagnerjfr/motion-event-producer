@@ -7,7 +7,8 @@ public class LoggingEventEmitter implements EventEmitter {
     @Override
     public void emitPosition(PositionEvent event) {
         System.out.printf(
-                "{\"type\":\"position\",\"ballId\":\"%s\",\"timestampMs\":%d,\"x\":%.4f,\"y\":%.4f,\"vx\":%.4f,\"vy\":%.4f}%n",
+                "{\"type\":\"position\",\"sessionId\":\"%s\",\"ballId\":\"%s\",\"timestampMs\":%d,\"x\":%.4f,\"y\":%.4f,\"vx\":%.4f,\"vy\":%.4f}%n",
+                event.sessionId(),
                 event.ballId(),
                 event.timestampMs(),
                 event.x(),
@@ -20,7 +21,8 @@ public class LoggingEventEmitter implements EventEmitter {
     @Override
     public void emitCollision(CollisionEvent event) {
         System.out.printf(
-                "{\"type\":\"collision\",\"ballAId\":\"%s\",\"ballBId\":\"%s\",\"timestampMs\":%d,\"x\":%.4f,\"y\":%.4f,\"relativeSpeed\":%.4f}%n",
+                "{\"type\":\"collision\",\"sessionId\":\"%s\",\"ballAId\":\"%s\",\"ballBId\":\"%s\",\"timestampMs\":%d,\"x\":%.4f,\"y\":%.4f,\"relativeSpeed\":%.4f}%n",
+                event.sessionId(),
                 event.ballAId(),
                 event.ballBId(),
                 event.timestampMs(),

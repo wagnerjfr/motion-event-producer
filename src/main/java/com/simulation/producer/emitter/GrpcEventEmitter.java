@@ -35,6 +35,7 @@ public class GrpcEventEmitter implements EventEmitter {
         try {
             EventEnvelope envelope = EventEnvelope.newBuilder()
                     .setPosition(PositionEventMessage.newBuilder()
+                            .setSessionId(event.sessionId())
                             .setBallId(event.ballId())
                             .setTimestampMs(event.timestampMs())
                             .setX(event.x())
@@ -57,6 +58,7 @@ public class GrpcEventEmitter implements EventEmitter {
         try {
             EventEnvelope envelope = EventEnvelope.newBuilder()
                     .setCollision(CollisionEventMessage.newBuilder()
+                            .setSessionId(event.sessionId())
                             .setBallAId(event.ballAId())
                             .setBallBId(event.ballBId())
                             .setTimestampMs(event.timestampMs())

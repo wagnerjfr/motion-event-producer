@@ -1,6 +1,7 @@
 package com.simulation.producer.events;
 
 public record PositionEvent(
+        String sessionId,
         String ballId,
         long timestampMs,
         double x,
