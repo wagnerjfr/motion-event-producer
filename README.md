@@ -24,7 +24,7 @@ _A practical guide to producing motion and collision events from a Java physics 
 ### ⭐ [Turning a Java Physics Simulation into a Real-Time Kafka Producer via WebSocket Gateway](https://itnext.io/how-i-built-a-java-physics-simulation-that-streams-real-time-events-via-websocket-gateway-to-kafka-afdf079f8a3a)
 _Practical guide to streaming motion and collision events from JavaFX + dyn4j through a WebSocket ingestion layer, with AKHQ monitoring._
 
-### ⭐ [Building a Real-Time Physics Event Pipeline with Java, gRPC, and Kafka]()
+### ⭐ [Building a Real-Time Physics Event Pipeline with Java, gRPC, and Kafka](https://medium.com/itnext/building-a-real-time-physics-event-pipeline-with-java-grpc-and-kafka-d24a032b4042)
 _A practical implementation using JavaFX + dyn4j + Spring Boot to publish typed motion and collision events through a gRPC gateway._
 
 ## Running locally
