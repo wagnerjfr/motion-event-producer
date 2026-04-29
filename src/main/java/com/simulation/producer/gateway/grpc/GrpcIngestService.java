@@ -65,6 +65,7 @@ public class GrpcIngestService extends MotionEventIngestServiceGrpc.MotionEventI
 
     private void publishPosition(PositionEventMessage event) throws Exception {
         String payload = objectMapper.writeValueAsString(Map.of(
+                "sessionId", event.getSessionId(),
                 "ballId", event.getBallId(),
                 "timestampMs", event.getTimestampMs(),
                 "x", event.getX(),
@@ -77,6 +78,7 @@ public class GrpcIngestService extends MotionEventIngestServiceGrpc.MotionEventI
 
     private void publishCollision(CollisionEventMessage event) throws Exception {
         String payload = objectMapper.writeValueAsString(Map.of(
+                "sessionId", event.getSessionId(),
                 "ballAId", event.getBallAId(),
                 "ballBId", event.getBallBId(),
                 "timestampMs", event.getTimestampMs(),

@@ -31,6 +31,8 @@ import org.dyn4j.world.listener.ContactListenerAdapter;
 import org.dyn4j.world.ContactCollisionData;
 import org.dyn4j.dynamics.contact.Contact;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +42,8 @@ import java.util.Random;
 import java.util.Set;
 
 public class CircleCollisionsApp extends Application {
+    private static final DateTimeFormatter SESSION_RUN_STAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss");
+    private static final String WINDOW_TITLE_PREFIX = "JavaFX + dyn4j Circle Collisions";
 
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 700;
@@ -65,6 +69,9 @@ public class CircleCollisionsApp extends Application {
     private ConfigurableApplicationContext springContext;
 
     private int nextBallId = 1;
+    private long sessionSequence = 0;
+    private String sessionId;
+    private String sessionRunStamp;
     private long lastPositionEmitMs = 0;
 
     private World<Body> world;
@@ -77,6 +84,7 @@ public class CircleCollisionsApp extends Application {
                 .headless(false)
                 .run();
         eventEmitter = springContext.getBean("eventEmitter", EventEmitter.class);
+        sessionRunStamp = LocalDateTime.now().format(SESSION_RUN_STAMP_FORMATTER);
 
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
@@ -101,11 +109,12 @@ public class CircleCollisionsApp extends Application {
         root.setTop(controls);
 
         Scene scene = new Scene(root, WIDTH, HEIGHT + 55);
-        stage.setTitle("JavaFX + dyn4j Circle Collisions");
+        stage.setTitle(WINDOW_TITLE_PREFIX);
         stage.setScene(scene);
         stage.show();
 
         createWorld();
+        stage.setTitle(WINDOW_TITLE_PREFIX + " — " + sessionId);
         spawnInitialCircles(INITIAL_CIRCLES);
 
         pauseResume.setOnAction(e -> {
@@ -117,6 +126,7 @@ public class CircleCollisionsApp extends Application {
             paused = false;
             pauseResume.setText("Pause");
             createWorld();
+            stage.setTitle(WINDOW_TITLE_PREFIX + " — " + sessionId);
             spawnInitialCircles(INITIAL_CIRCLES);
         });
 
@@ -182,6 +192,7 @@ public class CircleCollisionsApp extends Application {
                 Vector2 p = contact.getPoint();
 
                 eventEmitter.emitCollision(new CollisionEvent(
+                        sessionId,
                         idA,
                         idB,
                         System.currentTimeMillis(),
@@ -209,6 +220,7 @@ public class CircleCollisionsApp extends Application {
         lastEmittedAtMs.clear();
         activePairContacts.clear();
         nextBallId = 1;
+        sessionId = nextSessionId();
         lastPositionEmitMs = 0;
 
         double thicknessPx = 30;
@@ -294,6 +306,7 @@ public class CircleCollisionsApp extends Application {
             }
 
             eventEmitter.emitPosition(new PositionEvent(
+                    sessionId,
                     ballId,
                     now,
                     p.x,
@@ -308,6 +321,11 @@ public class CircleCollisionsApp extends Application {
 
     private String pairKey(String a, String b) {
         return a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
+    }
+
+    private String nextSessionId() {
+        sessionSequence++;
+        return "session-" + sessionRunStamp + "-" + sessionSequence;
     }
 
     private void render(GraphicsContext gc) {
