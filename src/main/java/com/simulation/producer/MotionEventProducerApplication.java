@@ -2,6 +2,7 @@ package com.simulation.producer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simulation.producer.emitter.EventEmitter;
+import com.simulation.producer.emitter.GrpcEventEmitter;
 import com.simulation.producer.emitter.KafkaEventEmitter;
 import com.simulation.producer.emitter.LoggingEventEmitter;
 import com.simulation.producer.emitter.WebSocketEventEmitter;
@@ -55,15 +56,30 @@ public class MotionEventProducerApplication {
         );
     }
 
+    @Bean(destroyMethod = "shutdown")
+    public GrpcEventEmitter grpcEventEmitter(
+            @Value("${app.grpc.target}") String grpcTarget,
+            @Value("${app.grpc.deadline-ms}") long deadlineMs,
+            LoggingEventEmitter loggingEventEmitter
+    ) {
+        return new GrpcEventEmitter(
+                grpcTarget,
+                deadlineMs,
+                loggingEventEmitter
+        );
+    }
+
     @Bean(name = "eventEmitter")
     public EventEmitter eventEmitter(
             @Value("${app.transport.mode:kafka}") String transportMode,
             KafkaEventEmitter kafkaEventEmitter,
             WebSocketEventEmitter websocketEventEmitter,
+            GrpcEventEmitter grpcEventEmitter,
             LoggingEventEmitter loggingEventEmitter
     ) {
         return switch (transportMode.toLowerCase()) {
             case "websocket", "ws" -> websocketEventEmitter;
+            case "grpc" -> grpcEventEmitter;
             case "logs", "log", "logging" -> loggingEventEmitter;
             case "kafka" -> kafkaEventEmitter;
             default -> {

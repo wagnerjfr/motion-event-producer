@@ -6,18 +6,26 @@
 
 ## Quick start: choose a transport mode
 
-This project supports 3 runtime modes:
+This project supports 4 runtime modes:
 
-1. **Direct Kafka mode** (`APP_TRANSPORT_MODE=kafka`)  
-   The simulation app publishes directly to Kafka topics.
-2. **WebSocket gateway mode** (`APP_TRANSPORT_MODE=websocket`)  
-   The simulation app sends events to a WebSocket service, and that service publishes to Kafka.
-3. **Logs-only mode** (`APP_TRANSPORT_MODE=logs`)  
+1. **Logs-only mode** (`APP_TRANSPORT_MODE=logs`)  
    Events are printed to stdout (no Kafka required).
+2. **Direct Kafka mode** (`APP_TRANSPORT_MODE=kafka`)  
+   The simulation app publishes directly to Kafka topics.
+3. **WebSocket gateway mode** (`APP_TRANSPORT_MODE=websocket`)  
+   The simulation app sends events to a WebSocket service, and that service publishes to Kafka.
+4. **gRPC gateway mode** (`APP_TRANSPORT_MODE=grpc`)  
+   The simulation app sends events to a gRPC service, and that service publishes to Kafka.
 
 ## Full Article:
 ### ⭐ [How I Built a Java Physics Simulation That Publishes Real-Time Kafka Events](https://medium.com/itnext/how-i-built-a-java-physics-simulation-that-publishes-real-time-kafka-events-2ec3f9d71156)
 _A practical guide to producing motion and collision events from a Java physics simulation into Kafka._
+
+### ⭐ [Turning a Java Physics Simulation into a Real-Time Kafka Producer via WebSocket Gateway](https://itnext.io/how-i-built-a-java-physics-simulation-that-streams-real-time-events-via-websocket-gateway-to-kafka-afdf079f8a3a)
+_Practical guide to streaming motion and collision events from JavaFX + dyn4j through a WebSocket ingestion layer, with AKHQ monitoring._
+
+### ⭐ [Building a Real-Time Physics Event Pipeline with Java, gRPC, and Kafka]()
+_A practical implementation using JavaFX + dyn4j + Spring Boot to publish typed motion and collision events through a gRPC gateway._
 
 ## Running locally
 
@@ -28,7 +36,7 @@ AKHQ is a lightweight web UI for Kafka. You can use it to inspect topics, browse
 - Docker running locally
 - Java 17
 - Maven 3.9+
-- Ports available: `9092` (Kafka), `8081` (AKHQ), and `8080` (gateway, if using websocket mode)
+- Ports available: `9092` (Kafka), `8081` (AKHQ), `8080` (websocket gateway), and `9091` (recommended gRPC gateway port for local runs)
 
 ### Get the project
 
@@ -45,7 +53,19 @@ mvn -DskipTests compile
 
 ---
 
-## Mode A: Direct Kafka mode
+## Mode A: Logs-only mode (no Kafka)
+
+Use this mode if Kafka is unavailable or you just want to test simulation + event generation quickly:
+
+```bash
+APP_TRANSPORT_MODE=logs mvn javafx:run
+```
+
+Tip: `SERVER_PORT=0` ensures the JavaFX producer doesn't conflict with services already using port `8080`.
+
+---
+
+## Mode B: Direct Kafka mode
 
 Use this mode when the producer app can connect directly to Kafka.
 
@@ -55,7 +75,7 @@ Set:
 APP_TRANSPORT_MODE=kafka
 ```
 
-### A1) Start Kafka + AKHQ
+### B1) Start Kafka + AKHQ
 
 #### 1) Create a Docker network (once)
 
@@ -129,7 +149,7 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --topic motion-co
 
 ---
 
-## Mode B: WebSocket gateway mode (Kafka behind service)
+## Mode C: WebSocket gateway mode (Kafka behind service)
 
 Use this mode when you want Kafka hidden behind a backend service.
 
@@ -137,11 +157,11 @@ Event flow:
 
 `Simulation app -> WebSocket gateway -> Kafka`
 
-### B1) Start Kafka + create topics
+### C1) Start Kafka + create topics
 
-Reuse steps A1.2 and A1.4 above (Kafka + topics).
+Reuse steps B1.2 and B1.4 above (Kafka + topics).
 
-### B2) Run the gateway service
+### C2) Run the gateway service
 
 This project includes a minimal gateway skeleton:
 
@@ -154,7 +174,7 @@ Run it:
 SERVER_PORT=8080 mvn -DskipTests spring-boot:run -Dspring-boot.run.main-class=com.simulation.producer.gateway.EventGatewayApplication
 ```
 
-### B3) Run the simulation producer in websocket mode
+### C3) Run the simulation producer in websocket mode
 
 ```bash
 APP_TRANSPORT_MODE=websocket \
@@ -163,21 +183,49 @@ SERVER_PORT=0 \
 mvn javafx:run
 ```
 
-### B4) Verify in AKHQ
+### C4) Verify in AKHQ
 
 Open `http://localhost:8081` and inspect `motion-position` and `motion-collision` topics.
 
 ---
 
-## Mode C: Logs-only mode (no Kafka)
+## Mode D: gRPC gateway mode (Kafka behind service)
 
-Use this mode if Kafka is unavailable or you just want to test simulation + event generation quickly:
+Use this mode when you want Kafka hidden behind a gRPC backend service.
+
+Event flow:
+
+`Simulation app -> gRPC gateway -> Kafka`
+
+### D1) Start Kafka + create topics
+
+Reuse steps B1.2 and B1.4 above (Kafka + topics).
+
+### D2) Run the gateway service
+
+This project includes a gRPC ingest gateway running inside the same Spring Boot gateway app.
+
+Run it:
 
 ```bash
-APP_TRANSPORT_MODE=logs mvn javafx:run
+SERVER_PORT=8080 \
+APP_GATEWAY_GRPC_ENABLED=true \
+APP_GATEWAY_GRPC_PORT=9091 \
+mvn -DskipTests spring-boot:run -Dspring-boot.run.main-class=com.simulation.producer.gateway.EventGatewayApplication
 ```
 
-Tip: `SERVER_PORT=0` ensures the JavaFX producer doesn't conflict with services already using port `8080`.
+### D3) Run the simulation producer in gRPC mode
+
+```bash
+APP_TRANSPORT_MODE=grpc \
+APP_GRPC_TARGET=localhost:9091 \
+SERVER_PORT=0 \
+mvn javafx:run
+```
+
+### D4) Verify in AKHQ
+
+Open `http://localhost:8081` and inspect `motion-position` and `motion-collision` topics.
 
 ---
 
@@ -200,13 +248,19 @@ mvn javafx:run
 
 | Variable | Default | Used in mode |
 |---|---|---|
-| `APP_TRANSPORT_MODE` | `kafka` | kafka, websocket, logs |
+| `APP_TRANSPORT_MODE` | `kafka` | kafka, websocket, grpc, logs |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | kafka, websocket-gateway |
 | `KAFKA_TOPIC_POSITION` | `motion-position` | kafka, websocket-gateway |
 | `KAFKA_TOPIC_COLLISION` | `motion-collision` | kafka, websocket-gateway |
 | `APP_WEBSOCKET_URL` | `ws://localhost:8080/ws/events` | websocket |
 | `APP_WEBSOCKET_RECONNECT_MS` | `2000` | websocket |
+| `APP_GRPC_TARGET` | `localhost:9090` | grpc |
+| `APP_GRPC_DEADLINE_MS` | `1000` | grpc |
 | `APP_GATEWAY_WEBSOCKET_PATH` | `/ws/events` | websocket-gateway |
+| `APP_GATEWAY_GRPC_ENABLED` | `false` | grpc-gateway |
+| `APP_GATEWAY_GRPC_PORT` | `9090` | grpc-gateway |
+
+> Note: `APP_GRPC_TARGET` and `APP_GATEWAY_GRPC_PORT` must match. If you get `Address already in use`, pick a free port (for example `9091`) and use it in both variables.
 
 ### Bootstrap address quick reference
 
