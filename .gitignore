@@ -13,3 +13,6 @@ out/
 
 # Logs
 *.log
+
+# Agent/tooling files
+AGENTS.md
